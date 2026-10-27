@@ -43,6 +43,13 @@ jobs:
               print(f"Scene OK: {item} ({scene.stat().st_size} bytes)")
           PY
 
+      - name: Select project WebGL template for this CI build
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'webGLTemplate: APPLICATION:Default' ProjectSettings/ProjectSettings.asset
+          sed -i 's/webGLTemplate: APPLICATION:Default/webGLTemplate: PROJECT:DungeonsPWA/' ProjectSettings/ProjectSettings.asset
+
       - name: Build WebGL
         uses: game-ci/unity-builder@v4
         env:
