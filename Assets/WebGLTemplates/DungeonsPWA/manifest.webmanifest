@@ -1,6 +1,6 @@
 {
   "id": "./",
-  "name": "{{{ PRODUCT_NAME }}}",
+  "name": "SPECTRE",
   "short_name": "Dungeons",
   "description": "The Unity game, playable in a mobile browser.",
   "start_url": "./",
