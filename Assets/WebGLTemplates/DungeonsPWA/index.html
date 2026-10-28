@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111018">
+  <meta name="description" content="{{{ PRODUCT_NAME }}} — playable Unity game">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <title>{{{ PRODUCT_NAME }}}</title>
+  <style>
+    :root { color-scheme: dark; background:#111018; color:#f7f4ff; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    * { box-sizing:border-box; }
+    html,body { margin:0; width:100%; height:100%; overflow:hidden; background:#111018; }
+    body { min-height:100dvh; display:flex; flex-direction:column; }
+    #app { flex:1; min-height:0; display:flex; flex-direction:column; }
+    #topbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding: max(10px,env(safe-area-inset-top)) 14px 10px; background:#17151f; border-bottom:1px solid #353141; }
+    #brand { font-size:14px; font-weight:750; letter-spacing:.04em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    #install { display:none; border:1px solid #7164a5; background:#28223b; color:#fff; border-radius:999px; padding:8px 12px; font-weight:650; }
+    #stage { flex:1; min-height:0; display:flex; align-items:center; justify-content:center; position:relative; }
+    #unity-container { width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+    #unity-canvas { display:block; width:100%; height:100%; max-width:100vw; max-height:100%; background:#09080d; outline:none; }
+    #loading { position:absolute; inset:0; display:flex; flex-direction:column; gap:14px; align-items:center; justify-content:center; background:#111018; padding:24px; text-align:center; }
+    #loading-title { font-weight:750; }
+    #track { width:min(320px,80vw); height:7px; border-radius:10px; overflow:hidden; background:#302b3d; }
+    #progress { width:0%; height:100%; background:#a99af8; transition:width .15s linear; }
+    #status { max-width:34rem; color:#c5bfd5; font-size:13px; line-height:1.5; }
+    #footer { padding:7px 12px max(7px,env(safe-area-inset-bottom)); text-align:center; color:#898398; font-size:11px; background:#17151f; }
+    @media (orientation:landscape) and (max-height:520px) { #topbar { padding:5px 10px; } #footer { display:none; } }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header id="topbar"><div id="brand">{{{ PRODUCT_NAME }}}</div><button id="install" type="button">Install game</button></header>
+    <main id="stage">
+      <div id="unity-container"><canvas id="unity-canvas" tabindex="-1" aria-label="{{{ PRODUCT_NAME }}} game"></canvas></div>
+      <div id="loading" role="status" aria-live="polite">
+        <div id="loading-title">Loading game…</div>
+        <div id="track"><div id="progress"></div></div>
+        <div id="status">Preparing the Unity player. The first load may take a little longer.</div>
+      </div>
+    </main>
+    <footer id="footer">For the best experience, keep this tab open while the game loads.</footer>
+  </div>
+  <script>
+    const canvas = document.querySelector("#unity-canvas");
+    const loading = document.querySelector("#loading");
+    const progress = document.querySelector("#progress");
+    const status = document.querySelector("#status");
+    const mobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
+    const config = {
+      dataUrl: "{{{ DATA_FILENAME }}}",
+      frameworkUrl: "{{{ FRAMEWORK_FILENAME }}}",
+      codeUrl: "{{{ CODE_FILENAME }}}",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "{{{ COMPANY_NAME }}}",
+      productName: "{{{ PRODUCT_NAME }}}",
+      productVersion: "{{{ PRODUCT_VERSION }}}",
+      matchWebGLToCanvasSize: true,
+      devicePixelRatio: Math.min(window.devicePixelRatio || 1, mobile ? 1.5 : 2)
+    };
+    if (mobile) document.documentElement.classList.add("mobile");
+    const loader = document.createElement("script");
+    loader.src = "{{{ LOADER_FILENAME }}}";
+    loader.onload = () => createUnityInstance(canvas, config, value => {
+      progress.style.width = Math.round(value * 100) + "%";
+      status.textContent = value < 1 ? "Loading game assets… " + Math.round(value * 100) + "%" : "Starting game…";
+    }).then(instance => {
+      loading.style.display = "none";
+      window.unityInstance = instance;
+    }).catch(error => {
+      status.textContent = "The game could not start. Reload the page and check the browser console. " + error;
+      document.querySelector("#loading-title").textContent = "Unable to load game";
+    });
+    loader.onerror = () => {
+      document.querySelector("#loading-title").textContent = "Game files not found";
+      status.textContent = "This page needs a completed Unity WebGL build in the same folder. Build output has not yet been verified.";
+    };
+    document.body.appendChild(loader);
+
+    let installPrompt;
+    const installButton = document.querySelector("#install");
+    window.addEventListener("beforeinstallprompt", event => {
+      event.preventDefault(); installPrompt = event; installButton.style.display = "block";
+    });
+    installButton.addEventListener("click", async () => {
+      if (!installPrompt) return;
+      installPrompt.prompt(); await installPrompt.userChoice; installPrompt = null; installButton.style.display = "none";
+    });
+    if ("serviceWorker" in navigator && location.protocol === "https:") {
+      window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(error => console.warn("PWA worker registration failed", error)));
+    }
+  </script>
+</body>
+</html>

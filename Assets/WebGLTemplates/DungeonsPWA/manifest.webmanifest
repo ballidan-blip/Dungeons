@@ -1,0 +1,20 @@
+{
+  "id": "./",
+  "name": "SPECTRE",
+  "short_name": "Dungeons",
+  "description": "The Unity game, playable in a mobile browser.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#111018",
+  "theme_color": "#111018",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

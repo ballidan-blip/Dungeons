@@ -1,0 +1,99 @@
+name: Unity WebGL build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, feature/unity-webgl-pwa-bootstrap]
+    paths:
+      - "Assets/**"
+      - "Packages/**"
+      - "ProjectSettings/**"
+      - ".github/workflows/unity-webgl.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-webgl:
+    name: Build Unity WebGL
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Validate enabled scene exists and is non-empty
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, sys
+          settings = Path("ProjectSettings/EditorBuildSettings.asset").read_text(encoding="utf-8")
+          paths = re.findall(r"(?m)^\s*- enabled: 1\s*\n\s*path: (.+?)\s*\n", settings)
+          if not paths:
+              print("ERROR: no enabled build scenes in EditorBuildSettings.asset")
+              sys.exit(1)
+          for item in paths:
+              scene = Path(item)
+              if not scene.is_file() or scene.stat().st_size == 0:
+                  print(f"ERROR: enabled build scene is missing or empty: {item}")
+                  sys.exit(2)
+              print(f"Scene OK: {item} ({scene.stat().st_size} bytes)")
+          PY
+
+      - name: Select project WebGL template for this CI build
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'webGLTemplate: APPLICATION:Default' ProjectSettings/ProjectSettings.asset
+          sed -i 's/webGLTemplate: APPLICATION:Default/webGLTemplate: PROJECT:DungeonsPWA/' ProjectSettings/ProjectSettings.asset
+
+      - name: Build WebGL
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: WebGL
+          unityVersion: 2022.3.39f1
+          buildName: Dungeons
+          buildsPath: build
+          allowDirtyBuild: true
+
+      - name: Attach PWA template assets and verify build output
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="build/WebGL"
+          test -d "$output"
+          test -f "$output/index.html"
+          cp Assets/WebGLTemplates/DungeonsPWA/manifest.webmanifest "$output/manifest.webmanifest"
+          cp Assets/WebGLTemplates/DungeonsPWA/service-worker.js "$output/service-worker.js"
+          mkdir -p "$output/icons"
+          cp Assets/WebGLTemplates/DungeonsPWA/icons/icon.svg "$output/icons/icon.svg"
+          python3 - <<'PY'
+          from pathlib import Path
+          import sys
+          root = Path("build/WebGL")
+          html = root / "index.html"
+          content = html.read_text(encoding="utf-8", errors="replace")
+          # Preserve Unity's generated loader/config; PWA registration can be added without replacing it.
+          if "service-worker.js" not in content:
+              content = content.replace("</body>", '<script>if ("serviceWorker" in navigator && location.protocol === "https:") addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(console.warn));</script>\n</body>')
+              html.write_text(content, encoding="utf-8")
+          required = [root / "manifest.webmanifest", root / "service-worker.js", root / "icons/icon.svg"]
+          if not all(p.is_file() and p.stat().st_size for p in required):
+              sys.exit("PWA shell files missing or empty")
+          print("Unity WebGL output and PWA shell files are present.")
+          PY
+
+      - name: Upload WebGL artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dungeons-webgl-pwa
+          path: build/WebGL/
+          if-no-files-found: error
+          retention-days: 14
