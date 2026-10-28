@@ -2,6 +2,13 @@ name: Unity WebGL build
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "Assets/**"
+      - "Packages/**"
+      - "ProjectSettings/**"
+      - ".github/workflows/unity-webgl.yml"
   push:
     branches: [main, feature/unity-webgl-pwa-bootstrap]
     paths:
